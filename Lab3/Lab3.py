@@ -1,6 +1,6 @@
 import random
 import numpy
-import tkinter
+import scipy.stats
 
 import tkinter.messagebox
 
@@ -35,14 +35,12 @@ y = [[random.randint(int(y_min), int(y_max)) for i in range(m)] for j in range(4
 
 
 def kohren(dispersion, m):
-    gt = {1: 0.9065, 2: 0.7679, 3: 0.6841, 4: 0.6287, 5: 0.5892, 6: 0.5598, 7: 0.5365, 8: 0.5175, 9: 0.5017, 10: 0.4884}
+    gt = {1: 0.9065, 2: 0.7679, 3: 0.6841, 4: 0.6287, 5: 0.5892, 6: 0.5598, 7:0.5365, 8: 0.5175, 9: 0.5017, 10: 0.4884}
     gp = max(dispersion) / sum(dispersion)
     return gp < gt[m - 1]
 
 
 def student(dispersion_reproduction, m, y_mean, xn):
-    tt = {4: 2.776, 8: 2.306, 12: 2.179, 16: 2.120, 20: 2.086, 24: 2.064, 28: 2.048}
-
     dispersion_statistic_mark = (dispersion_reproduction / (4 * m)) ** 0.5
 
     beta = [1 / 4 * sum(y_mean[j] for j in range(4))]
@@ -56,26 +54,23 @@ def student(dispersion_reproduction, m, y_mean, xn):
     for i in beta:
         t.append(abs(i) / dispersion_statistic_mark)
 
-    return t[0] > tt[(m - 1) * 4], t[1] > tt[(m - 1) * 4], t[2] > tt[(m - 1) * 4], t[3] > tt[(m - 1) * 4]
+    check_st = scipy.stats.t.ppf((1 + 0.95)/2, (m-1) * 4)
+
+    return t[0] > check_st, t[1] > check_st, t[2] > check_st, t[3] > check_st
 
 
 def fisher(m, d, y_mean, yo, dispersion_reproduction):
-    ft = {1: {4: 7.7, 8: 5.3, 12: 4.8, 16: 4.5, 20: 4.4, 24: 4.3, 28: 4.2},
-          2: {4: 6.9, 8: 4.5, 12: 3.9, 16: 3.6, 20: 3.5, 24: 3.4, 28: 3.3},
-          3: {4: 6.6, 8: 4.1, 12: 3.5, 16: 3.2, 20: 3.1, 24: 3.0, 28: 3.0},
-          4: {4: 6.4, 8: 3.8, 12: 3.3, 16: 3.0, 20: 2.9, 24: 2.8, 28: 2.7},
-          5: {4: 6.3, 8: 3.7, 12: 3.1, 16: 2.9, 20: 2.7, 24: 2.6, 28: 2.6},
-          6: {4: 6.2, 8: 3.6, 12: 3.0, 16: 2.7, 20: 2.6, 24: 2.5, 28: 2.4}}
-
+    
     dispersion_ad = 0
     for i in range(4):
         dispersion_ad += (yo[i] - y_mean[i]) ** 2
-
+        
     dispersion_ad = dispersion_ad * m / (4 - d)
 
     fp = dispersion_ad / dispersion_reproduction
-
-    return fp < ft[4 - d][(m - 1) * 4]
+    check_f = scipy.stats.f.ppf(0.95, 4 - d, (m-1)*4)
+    
+    return fp < check_f
 
 
 def normalized_multiplier(x, y_mean):
@@ -90,12 +85,12 @@ def normalized_multiplier(x, y_mean):
         mx[i] /= 4
         axx[i] /= 4
         ax[i] /= 4
-
+    
     my = sum(y_mean) / 4
 
-    a12 = (x[0][0] * x[0][1] + x[1][0] * x[1][1] + x[2][0] * x[2][1] + x[3][0] * x[3][1]) / 4
-    a13 = (x[0][0] * x[0][2] + x[1][0] * x[1][2] + x[2][0] * x[2][2] + x[3][0] * x[3][2]) / 4
-    a23 = (x[0][1] * x[0][2] + x[1][1] * x[1][2] + x[2][1] * x[2][2] + x[3][1] * x[3][2]) / 4
+    a12    = (x[0][0] * x[0][1] + x[1][0] * x[1][1] + x[2][0] * x[2][1] + x[3][0] * x[3][1]) / 4
+    a13    = (x[0][0] * x[0][2] + x[1][0] * x[1][2] + x[2][0] * x[2][2] + x[3][0] * x[3][2]) / 4
+    a23    = (x[0][1] * x[0][2] + x[1][1] * x[1][2] + x[2][1] * x[2][2] + x[3][1] * x[3][2]) / 4
 
     a = numpy.array([[1, *mx],
                      [mx[0], axx[0], a12, a13],
@@ -112,11 +107,11 @@ def next_m(arr):
 
 
 while True:
-    while True:
+    while True:            
         y_mean = []
         for i in range(4):
             y_mean.append(sum(y[i]) / m)
-
+        
         dispersion = []
         for i in range(len(y)):
             dispersion.append(0)
@@ -134,24 +129,25 @@ while True:
 
     k = student(dispersion_reproduction, m, y_mean, xn)
     d = sum(k)
-
+    
     b = normalized_multiplier(x, y_mean)
     b = [b[i] * k[i] for i in range(4)]
 
     yo = []
     for i in range(4):
         yo.append(b[0] + b[1] * x[i][0] + b[2] * x[i][1] + b[3] * x[i][2])
-
+    
     if d == 4:
         m += 1
         next_m(y)
-
+        
     elif fisher(m, d, y_mean, yo, dispersion_reproduction):
         break
-
+    
     else:
         m += 1
         next_m(y)
+
 
 tkinter.Label(text="x1").grid()
 
